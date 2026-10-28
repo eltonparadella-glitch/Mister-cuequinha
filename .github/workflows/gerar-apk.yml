@@ -22,11 +22,31 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Preparar projeto
+        run: |
+          Z=$(find . -maxdepth 2 -name '*.zip' -not -path './.git/*' | head -1)
+          if [ -n "$Z" ]; then
+            echo "Usando o zip: $Z"
+            rm -rf /tmp/proj && mkdir -p /tmp/proj && unzip -q "$Z" -d /tmp/proj
+            ARQ=$(find /tmp/proj -name settings.gradle | head -1)
+          else
+            ARQ=$(find . -name settings.gradle -not -path './.git/*' | head -1)
+          fi
+          if [ -z "$ARQ" ]; then echo "ERRO: projeto nao encontrado"; find . -maxdepth 3 -not -path './.git*'; exit 1; fi
+          DIR=$(cd "$(dirname "$ARQ")" && pwd)
+          if [ ! -f "$DIR/app/build.gradle" ]; then echo "ERRO: falta a pasta app"; find "$DIR" -maxdepth 3; exit 1; fi
+          echo "Projeto em: $DIR"
+          echo "PROJ=$DIR" >> "$GITHUB_ENV"
+
       - name: Compilar o APK
-        run: gradle assembleDebug --no-daemon
+        run: |
+          cd "$PROJ"
+          gradle assembleDebug --no-daemon --stacktrace
+          mkdir -p "$GITHUB_WORKSPACE/saida"
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/saida/MisterCuequinha.apk"
 
       - name: Guardar o APK para download
         uses: actions/upload-artifact@v4
         with:
           name: MisterCuequinha-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: saida/MisterCuequinha.apk
